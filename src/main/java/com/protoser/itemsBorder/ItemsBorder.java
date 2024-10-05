@@ -84,10 +84,10 @@ public final class ItemsBorder extends JavaPlugin {
     }
 
     public void updateWorldborder(String itemType) {
+        addPickedUpItem(itemType);
         for (World world : Bukkit.getWorlds()) {
             world.getWorldBorder().setSize(getPickedUpInt()*4 + 2, 1);
         }
-        addPickedUpItem(itemType);
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
             onlinePlayer.sendActionBar(ChatColor.GREEN + "A new item has been discovered: " + itemType);
             onlinePlayer.playSound(onlinePlayer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
