@@ -26,7 +26,9 @@ public final class ItemsBorder extends JavaPlugin {
         loadItemList();
 
         CraftedItemsGUI craftedItemsGUI = new CraftedItemsGUI(this);
+        HelpCommand helpCommand = new HelpCommand();
         this.getCommand("items").setExecutor(craftedItemsGUI);
+        this.getCommand("help").setExecutor(helpCommand);
         getServer().getPluginManager().registerEvents(craftedItemsGUI, this);
 
         getServer().getPluginManager().registerEvents(new ItemPickupListener(this), this);

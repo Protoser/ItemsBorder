@@ -15,14 +15,14 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class CraftedItemsGUI implements CommandExecutor, Listener {
 
     private final ItemsBorder plugin;
     private final int ITEMS_PER_PAGE = 45;
+
+    private final Map<UUID, PlayerSettings> playerSettings = new HashMap<>();
 
     public CraftedItemsGUI(ItemsBorder plugin) {
         this.plugin = plugin;
@@ -30,20 +30,85 @@ public class CraftedItemsGUI implements CommandExecutor, Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (sender instanceof Player) {
-            Player player = (Player) sender;
+        if (sender instanceof Player player) {
+            if (args.length > 0) {
+                if (Objects.equals(args[0], "-")) {
+                    player.sendActionBar(ChatColor.GREEN + "" + plugin.getPickedUpInt() + " Items | " + (plugin.getPickedUpInt()*2+1) + " Worldborder");
+                    return true;
+                }
+            }
+
+            UUID playerUUID = player.getUniqueId();
+
+            playerSettings.putIfAbsent(playerUUID, new PlayerSettings());
+            PlayerSettings settings = playerSettings.get(playerUUID);
+
             player.sendActionBar(ChatColor.GREEN + "" + plugin.getPickedUpInt() + " Items | " + (plugin.getPickedUpInt()*2+1) + " Worldborder");
-            openCraftedItemsGUI(player, 0);
+
+            if (args.length > 0) {
+                String input = args[0];
+                try {
+                    settings.filter = null;
+                    int page = Integer.parseInt(input) - 1;
+                    openCraftedItemsGUI(player, Math.max(page, 0), settings);
+                } catch (NumberFormatException e) {
+                    int page = 0;
+                    if (args.length > 1) {
+                        try {
+                            page = Integer.parseInt(args[1]) - 1;
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    settings.filter = input.toUpperCase();
+                    openCraftedItemsGUI(player, page, settings);
+                }
+            } else {
+                settings.filter = null;
+                openCraftedItemsGUI(player, 0, settings);
+            }
             return true;
         }
         return false;
     }
 
-    public void openCraftedItemsGUI(Player player, int page) {
+    public void openCraftedItemsGUI(Player player, int page, PlayerSettings settings) {
         Set<String> craftedItemsSet = plugin.getPickedUpItems();
-        List<String> craftedItems = new ArrayList<>(craftedItemsSet);
-        craftedItems.sort(String::compareToIgnoreCase);
+        List<String> craftedItems;
+        if (settings.filter != null) {
+            craftedItems = new ArrayList<>();
+            for (String item : craftedItemsSet) {
+                if (item.startsWith(settings.filter)) {
+                    craftedItems.add(item);
+                }
+            }
+        }
+        else {
+            craftedItems = new ArrayList<>(craftedItemsSet);
+        }
+
+        if (settings.sortingMaterial) {
+            craftedItems.sort((item1, item2) -> {
+                Material material1 = Material.getMaterial(item1);
+                Material material2 = Material.getMaterial(item2);
+
+                if (material1 != null && material2 != null) {
+                    return Integer.compare(material1.ordinal(), material2.ordinal());
+                }
+                return 0;
+            });
+        } else {
+            craftedItems.sort(String::compareToIgnoreCase);
+        }
         int totalPages = (int) Math.ceil((double) craftedItems.size() / ITEMS_PER_PAGE);
+        if (page+1 > totalPages) {
+            if (totalPages == 0) {
+                page = 0;
+            }else {
+                page = totalPages - 1;
+            }
+        }
+        if (page < 0){
+            page = 0;
+        }
 
         Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Crafted Items - Page " + (page + 1) + "/" + totalPages);
 
@@ -69,6 +134,11 @@ public class CraftedItemsGUI implements CommandExecutor, Listener {
         if (page < totalPages - 1) {
             inventory.setItem(53, createNavigationItem(ChatColor.YELLOW + "Next Page", Material.GREEN_STAINED_GLASS_PANE));
         }
+        if (settings.sortingMaterial) {
+            inventory.setItem(49, createNavigationItem(ChatColor.YELLOW + "Sorting: Material", Material.YELLOW_STAINED_GLASS_PANE));
+        } else {
+            inventory.setItem(49, createNavigationItem(ChatColor.YELLOW + "Sorting: A-Z", Material.YELLOW_STAINED_GLASS_PANE));
+        }
         player.openInventory(inventory);
     }
 
@@ -87,6 +157,11 @@ public class CraftedItemsGUI implements CommandExecutor, Listener {
         if (event.getView().getTitle().startsWith(ChatColor.DARK_GREEN + "Crafted Items")) {
             event.setCancelled(true);
             Player player = (Player) event.getWhoClicked();
+            UUID playerUUID = player.getUniqueId();
+
+            PlayerSettings settings = playerSettings.get(playerUUID);
+            if (settings == null) return;
+
             int slot = event.getRawSlot();
 
             String title = ChatColor.stripColor(event.getView().getTitle());
@@ -109,10 +184,18 @@ public class CraftedItemsGUI implements CommandExecutor, Listener {
             }
 
             if (slot == 45 && currentPage > 0) {
-                openCraftedItemsGUI(player, currentPage - 1);
+                openCraftedItemsGUI(player, currentPage - 1, settings);
             } else if (slot == 53 && currentPage < (plugin.getPickedUpItems().size() / ITEMS_PER_PAGE)) {
-                openCraftedItemsGUI(player, currentPage + 1);
+                openCraftedItemsGUI(player, currentPage + 1, settings);
+            } else if (slot == 49) {
+                settings.sortingMaterial = !settings.sortingMaterial;
+                openCraftedItemsGUI(player, currentPage, settings);
             }
         }
+    }
+
+    private static class PlayerSettings {
+        boolean sortingMaterial = true;
+        String filter = null;
     }
 }

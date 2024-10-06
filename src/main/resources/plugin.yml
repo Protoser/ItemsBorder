@@ -1,11 +1,14 @@
 name: ItemsBorder
-version: '1.3'
+version: '1.4'
 main: com.protoser.itemsBorder.ItemsBorder
 api-version: '1.21'
 authors: [ Protoser ]
-description: Custom Solution for Project Management
+description: Play Minecraft but to increase the worldborder you need to collect new items!
 website: https://protoser.com
 commands:
   items:
     description: Opens a GUI displaying all items.
-    usage: /items
+    usage: /items [page|filter] [page]
+  help:
+    description: Help command.
+    usage: /help
